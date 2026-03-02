@@ -1,6 +1,3 @@
-// Rendert PDF-Seiten als Base64-PNG für OCR
-// Uses dynamic import to avoid crashing if pdfjs-dist has issues
-
 let pdfjsLoaded: any = null;
 
 async function getPdfjs() {
@@ -15,14 +12,22 @@ async function getPdfjs() {
   return pdfjsLoaded;
 }
 
+// Buffer kopieren damit er nicht "detached" wird
+function copyBuffer(buffer: ArrayBuffer): ArrayBuffer {
+  const copy = new ArrayBuffer(buffer.byteLength);
+  new Uint8Array(copy).set(new Uint8Array(buffer));
+  return copy;
+}
+
 export async function renderPdfPageToBase64(
   pdfBuffer: ArrayBuffer,
-  pageNumber: number,
+  pageIndex: number,
   scale: number = 2.0
 ): Promise<string> {
   const pdfjsLib = await getPdfjs();
-  const pdf = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
-  const page = await pdf.getPage(pageNumber);
+  // WICHTIG: Immer eine Kopie nutzen!
+  const pdf = await pdfjsLib.getDocument({ data: copyBuffer(pdfBuffer) }).promise;
+  const page = await pdf.getPage(pageIndex + 1); // pdfjs ist 1-basiert
   
   const viewport = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
@@ -30,7 +35,7 @@ export async function renderPdfPageToBase64(
   canvas.height = viewport.height;
   
   const context = canvas.getContext('2d')!;
-  await page.render({ canvasContext: context, viewport, canvas } as any).promise;
+  await page.render({ canvasContext: context, viewport }).promise;
   
   const dataUrl = canvas.toDataURL('image/png');
   return dataUrl.split(',')[1];
@@ -38,6 +43,6 @@ export async function renderPdfPageToBase64(
 
 export async function getPdfPageCount(pdfBuffer: ArrayBuffer): Promise<number> {
   const pdfjsLib = await getPdfjs();
-  const pdf = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
+  const pdf = await pdfjsLib.getDocument({ data: copyBuffer(pdfBuffer) }).promise;
   return pdf.numPages;
 }

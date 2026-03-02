@@ -1,164 +1,72 @@
-import { NavLink, useLocation } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { ReactNode } from 'react';
+import { NavLink } from '@/components/NavLink';
 import { useMonth } from '@/contexts/MonthContext';
-import {
-  LayoutDashboard,
-  Ticket,
-  FileSpreadsheet,
-  FileText,
-  Users,
-  Settings,
-  LogOut,
-  Menu,
-  X,
-  ChevronLeft,
-  ChevronRight,
-} from 'lucide-react';
-import { useState, ReactNode } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { LayoutDashboard, Ticket, FileSpreadsheet, FileText, Users, TrendingUp, LogOut, ChevronLeft, ChevronRight } from 'lucide-react';
 
-const navItems = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/tickets', label: 'Tickets', icon: Ticket },
-  { to: '/import', label: 'Excel-Import', icon: FileSpreadsheet },
-  { to: '/pdf-ruecklauf', label: 'PDF-Rücklauf', icon: FileText },
-  { to: '/mitarbeiter', label: 'Mitarbeiter', icon: Users },
-];
-
-export default function AppLayout({ children }: { children: ReactNode }) {
-  const { user, isAdmin, signOut } = useAuth();
+function MonthStepper() {
   const { activeMonth, setActiveMonth } = useMonth();
-  const location = useLocation();
-  const [collapsed, setCollapsed] = useState(false);
-  const [mobileOpen, setMobileOpen] = useState(false);
+  const [year, month] = activeMonth.split('-').map(Number);
 
-  const allItems = isAdmin
-    ? [...navItems, { to: '/einstellungen', label: 'Einstellungen', icon: Settings }]
-    : navItems;
+  const prev = () => {
+    const d = new Date(year, month - 2, 1);
+    setActiveMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+  const next = () => {
+    const d = new Date(year, month, 1);
+    setActiveMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  };
+
+  const label = new Date(year, month - 1, 1).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      {/* Mobile overlay */}
-      {mobileOpen && (
-        <div
-          className="fixed inset-0 bg-foreground/30 z-40 md:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
+    <div className="flex items-center gap-1 px-3 py-2 bg-sidebar-accent rounded-lg">
+      <button onClick={prev} className="p-1 hover:bg-white/10 rounded"><ChevronLeft className="h-3.5 w-3.5" /></button>
+      <span className="text-xs font-medium flex-1 text-center">{label}</span>
+      <button onClick={next} className="p-1 hover:bg-white/10 rounded"><ChevronRight className="h-3.5 w-3.5" /></button>
+    </div>
+  );
+}
 
+export default function AppLayout({ children }: { children: ReactNode }) {
+  const { user, signOut } = useAuth();
+
+  return (
+    <div className="flex min-h-screen bg-background">
       {/* Sidebar */}
-      <aside
-        className={`fixed md:relative z-50 h-full bg-sidebar text-sidebar-foreground flex flex-col transition-all duration-300
-          ${collapsed ? 'w-16' : 'w-60'}
-          ${mobileOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}
-        `}
-      >
-        {/* Logo */}
-        <div className="flex items-center h-14 px-4 border-b border-sidebar-border">
-          {!collapsed && (
-            <span className="text-lg font-bold text-sidebar-primary tracking-tight">
-              WIDI Controlling
-            </span>
-          )}
-          {collapsed && (
-            <span className="text-lg font-bold text-sidebar-primary mx-auto">W</span>
-          )}
+      <aside className="w-48 bg-sidebar text-sidebar-foreground flex flex-col shrink-0">
+        <div className="p-4 border-b border-sidebar-border">
+          <h1 className="text-base font-bold">WIDI Controlling</h1>
         </div>
 
-        {/* Month selector */}
-        {!collapsed && (
-          <div className="px-3 py-2">
-            <input
-              type="month"
-              value={activeMonth}
-              onChange={e => setActiveMonth(e.target.value)}
-              className="w-full bg-sidebar-accent text-sidebar-accent-foreground border-none rounded px-2 py-1 text-sm"
-            />
-          </div>
-        )}
+        <div className="p-3">
+          <MonthStepper />
+        </div>
 
-        {/* Nav */}
-        <nav className="flex-1 py-2 space-y-0.5 px-2 overflow-y-auto">
-          {allItems.map(item => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/'}
-              onClick={() => setMobileOpen(false)}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors
-                ${isActive
-                  ? 'bg-sidebar-accent text-sidebar-accent-foreground'
-                  : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
-                }
-                ${collapsed ? 'justify-center' : ''}
-              `}
-            >
-              <item.icon className="h-4 w-4 shrink-0" />
-              {!collapsed && <span>{item.label}</span>}
-            </NavLink>
-          ))}
+        <nav className="flex-1 p-2 space-y-0.5">
+          <NavLink to="/dashboard" icon={LayoutDashboard}>Dashboard</NavLink>
+          <NavLink to="/tickets" icon={Ticket}>Tickets</NavLink>
+          <NavLink to="/import" icon={FileSpreadsheet}>Excel-Import</NavLink>
+          <NavLink to="/pdf-ruecklauf" icon={FileText}>PDF-Rücklauf</NavLink>
+          <NavLink to="/mitarbeiter" icon={Users}>Mitarbeiter</NavLink>
+          <NavLink to="/analyse" icon={TrendingUp}>Analyse</NavLink>
         </nav>
 
-        {/* Footer */}
-        <div className="border-t border-sidebar-border p-3">
-          {!collapsed && user && (
-            <p className="text-xs text-sidebar-foreground/60 truncate mb-2">
-              {user.email}
-            </p>
-          )}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={signOut}
-              className="text-sidebar-foreground hover:bg-sidebar-accent"
-              title="Abmelden"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setCollapsed(!collapsed)}
-              className="text-sidebar-foreground hover:bg-sidebar-accent hidden md:flex"
-            >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-            </Button>
-          </div>
+        <div className="p-3 border-t border-sidebar-border">
+          <p className="text-xs text-sidebar-foreground/60 truncate mb-2">{user?.email}</p>
+          <Button variant="ghost" size="sm" className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground h-8" onClick={signOut}>
+            <LogOut className="h-3.5 w-3.5 mr-2" />Abmelden
+          </Button>
         </div>
       </aside>
 
       {/* Main */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Top bar */}
-        <header className="h-14 bg-card border-b flex items-center px-4 shrink-0">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="md:hidden mr-2"
-            onClick={() => setMobileOpen(true)}
-          >
-            <Menu className="h-5 w-5" />
-          </Button>
-          <h1 className="text-lg font-semibold text-foreground">
-            {allItems.find(i => i.to === location.pathname)?.label ?? 'WIDI'}
-          </h1>
-          <div className="ml-auto md:hidden">
-            <input
-              type="month"
-              value={activeMonth}
-              onChange={e => setActiveMonth(e.target.value)}
-              className="bg-secondary border rounded px-2 py-1 text-sm"
-            />
-          </div>
-        </header>
-
-        {/* Content */}
-        <main className="flex-1 overflow-y-auto p-4 md:p-6">
+      <main className="flex-1 overflow-auto">
+        <div className="p-6 max-w-7xl mx-auto">
           {children}
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 }

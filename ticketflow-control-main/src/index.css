@@ -1,0 +1,150 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 213 27% 14%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 213 27% 14%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 213 27% 14%;
+
+    --primary: 213 56% 24%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 30% 93%;
+    --secondary-foreground: 213 56% 24%;
+
+    --muted: 210 20% 95%;
+    --muted-foreground: 213 15% 46%;
+
+    --accent: 199 89% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 88%;
+    --input: 214 20% 88%;
+    --ring: 213 56% 24%;
+
+    --radius: 0.5rem;
+
+    /* Status colors */
+    --status-in-bearbeitung: 45 93% 47%;
+    --status-in-bearbeitung-bg: 45 100% 94%;
+    --status-erledigt: 213 80% 50%;
+    --status-erledigt-bg: 213 100% 95%;
+    --status-zur-unterschrift: 25 95% 53%;
+    --status-zur-unterschrift-bg: 25 100% 95%;
+    --status-abrechenbar: 271 76% 53%;
+    --status-abrechenbar-bg: 271 100% 96%;
+    --status-abgerechnet: 142 71% 45%;
+    --status-abgerechnet-bg: 142 76% 94%;
+
+    /* Sidebar */
+    --sidebar-background: 213 56% 24%;
+    --sidebar-foreground: 210 40% 90%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 213 56% 24%;
+    --sidebar-accent: 213 50% 30%;
+    --sidebar-accent-foreground: 0 0% 100%;
+    --sidebar-border: 213 50% 30%;
+    --sidebar-ring: 199 89% 48%;
+
+    /* Chart colors */
+    --chart-hochbau: 213 56% 24%;
+    --chart-elektro: 199 89% 48%;
+  }
+
+  .dark {
+    --background: 213 27% 8%;
+    --foreground: 210 40% 96%;
+
+    --card: 213 27% 12%;
+    --card-foreground: 210 40% 96%;
+
+    --popover: 213 27% 12%;
+    --popover-foreground: 210 40% 96%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 213 30% 18%;
+    --secondary-foreground: 210 40% 96%;
+
+    --muted: 213 25% 16%;
+    --muted-foreground: 213 15% 60%;
+
+    --accent: 199 89% 48%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 213 25% 20%;
+    --input: 213 25% 20%;
+    --ring: 199 89% 48%;
+
+    --sidebar-background: 213 30% 10%;
+    --sidebar-foreground: 210 30% 80%;
+    --sidebar-primary: 199 89% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 213 30% 16%;
+    --sidebar-accent-foreground: 210 40% 96%;
+    --sidebar-border: 213 30% 16%;
+    --sidebar-ring: 199 89% 48%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  code, pre {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .status-in_bearbeitung {
+    background-color: hsl(var(--status-in-bearbeitung-bg));
+    color: hsl(var(--status-in-bearbeitung));
+  }
+
+  .status-erledigt {
+    background-color: hsl(var(--status-erledigt-bg));
+    color: hsl(var(--status-erledigt));
+  }
+
+  .status-zur_unterschrift {
+    background-color: hsl(var(--status-zur-unterschrift-bg));
+    color: hsl(var(--status-zur-unterschrift));
+  }
+
+  .status-abrechenbar {
+    background-color: hsl(var(--status-abrechenbar-bg));
+    color: hsl(var(--status-abrechenbar));
+  }
+
+  .status-abgerechnet {
+    background-color: hsl(var(--status-abgerechnet-bg));
+    color: hsl(var(--status-abgerechnet));
+  }
+}

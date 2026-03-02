@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Search, ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Clock } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: 'in_bearbeitung', label: 'In Bearbeitung' },
@@ -89,22 +89,11 @@ export default function TicketsPage() {
   });
 
   const allSelected = tickets.length > 0 && tickets.every((t: any) => selected.has(t.id));
-
-  const toggleAll = () => {
-    if (allSelected) setSelected(new Set());
-    else setSelected(new Set(tickets.map((t: any) => t.id)));
-  };
-
+  const toggleAll = () => allSelected ? setSelected(new Set()) : setSelected(new Set(tickets.map((t: any) => t.id)));
   const toggleOne = (id: string) => {
     const next = new Set(selected);
-    if (next.has(id)) next.delete(id); else next.add(id);
+    next.has(id) ? next.delete(id) : next.add(id);
     setSelected(next);
-  };
-
-  const deleteSelected = () => {
-    if (selected.size === 0) return;
-    if (!confirm(`${selected.size} Ticket(s) wirklich löschen?`)) return;
-    deleteMutation.mutate(Array.from(selected));
   };
 
   return (
@@ -112,12 +101,7 @@ export default function TicketsPage() {
       <div className="flex flex-wrap gap-3 items-center">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="A-Nummer suchen..."
-            value={search}
-            onChange={e => { setSearch(e.target.value); setPage(0); }}
-            className="pl-9"
-          />
+          <Input placeholder="A-Nummer suchen..." value={search} onChange={e => { setSearch(e.target.value); setPage(0); }} className="pl-9" />
         </div>
         <Select value={monthFilter} onValueChange={(v: any) => { setMonthFilter(v); setPage(0); }}>
           <SelectTrigger className="w-[160px]"><SelectValue /></SelectTrigger>
@@ -143,7 +127,7 @@ export default function TicketsPage() {
         </Select>
         <span className="text-sm text-muted-foreground">{totalCount} Tickets</span>
         {selected.size > 0 && (
-          <Button variant="destructive" size="sm" onClick={deleteSelected} disabled={deleteMutation.isPending}>
+          <Button variant="destructive" size="sm" onClick={() => { if (confirm(`${selected.size} Ticket(s) löschen?`)) deleteMutation.mutate(Array.from(selected)); }} disabled={deleteMutation.isPending}>
             <Trash2 className="h-4 w-4 mr-1" />{selected.size} löschen
           </Button>
         )}
@@ -189,7 +173,7 @@ export default function TicketsPage() {
                 ))}
                 {tickets.length === 0 && !isLoading && (
                   <tr><td colSpan={6} className="py-8 text-center text-muted-foreground">
-                    {monthFilter === 'month' ? `Keine Tickets für ${activeMonth} gefunden` : 'Keine Tickets gefunden'}
+                    {monthFilter === 'month' ? `Keine Tickets für ${activeMonth}` : 'Keine Tickets gefunden'}
                   </td></tr>
                 )}
               </tbody>
@@ -214,6 +198,16 @@ export default function TicketsPage() {
 function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () => void; userId?: string }) {
   const queryClient = useQueryClient();
   const [newNote, setNewNote] = useState('');
+  const [showStunden, setShowStunden] = useState(false);
+  const [stundenForm, setStundenForm] = useState({ employee_id: '', stunden: '', leistungsdatum: new Date().toISOString().split('T')[0] });
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => {
+      const { data } = await supabase.from('employees').select('*').eq('aktiv', true).order('name');
+      return data ?? [];
+    },
+  });
 
   const { data: notes = [] } = useQuery({
     queryKey: ['ticket-notes', ticket.id],
@@ -223,10 +217,10 @@ function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () =>
     },
   });
 
-  const { data: worklogs = [] } = useQuery({
+  const { data: worklogs = [], refetch: refetchWorklogs } = useQuery({
     queryKey: ['ticket-worklogs', ticket.id],
     queryFn: async () => {
-      const { data } = await supabase.from('ticket_worklogs').select('*, employees(name)').eq('ticket_id', ticket.id).order('leistungsdatum', { ascending: false });
+      const { data } = await supabase.from('ticket_worklogs').select('*, employees(name, kuerzel)').eq('ticket_id', ticket.id).order('leistungsdatum', { ascending: false });
       return data ?? [];
     },
   });
@@ -234,7 +228,8 @@ function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () =>
   const updateStatus = useMutation({
     mutationFn: async (newStatus: string) => {
       await supabase.from('status_history').insert({ ticket_id: ticket.id, old_status: ticket.status, new_status: newStatus, changed_by: userId });
-      await supabase.from('tickets').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', ticket.id);
+      const { error } = await supabase.from('tickets').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', ticket.id);
+      if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tickets-list'] });
@@ -255,7 +250,6 @@ function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () =>
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
       onClose();
     },
-    onError: (e: any) => toast.error(e.message),
   });
 
   const addNote = useMutation({
@@ -270,6 +264,29 @@ function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () =>
     },
   });
 
+  const addStunden = useMutation({
+    mutationFn: async () => {
+      if (!stundenForm.employee_id || !stundenForm.stunden) throw new Error('Mitarbeiter und Stunden erforderlich');
+      const stunden = parseFloat(stundenForm.stunden.replace(',', '.'));
+      if (isNaN(stunden) || stunden <= 0) throw new Error('Ungültige Stundenzahl');
+      const { error } = await supabase.from('ticket_worklogs').insert({
+        ticket_id: ticket.id,
+        employee_id: stundenForm.employee_id,
+        stunden,
+        leistungsdatum: stundenForm.leistungsdatum,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Stunden eingetragen');
+      setStundenForm({ employee_id: '', stunden: '', leistungsdatum: new Date().toISOString().split('T')[0] });
+      setShowStunden(false);
+      refetchWorklogs();
+      queryClient.invalidateQueries({ queryKey: ['worklogs-analyse'] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
   const totalHours = worklogs.reduce((s: number, w: any) => s + Number(w.stunden ?? 0), 0);
 
   return (
@@ -279,6 +296,7 @@ function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () =>
           <DialogTitle className="font-mono text-lg">{ticket.a_nummer}</DialogTitle>
         </DialogHeader>
         <div className="space-y-5">
+          {/* Info */}
           <div className="grid grid-cols-2 gap-3 text-sm bg-muted/30 rounded-lg p-4">
             <div><span className="text-muted-foreground">Gewerk:</span> <strong>{ticket.gewerk}</strong></div>
             <div><span className="text-muted-foreground">Eingangsdatum:</span> <strong>{ticket.eingangsdatum ? new Date(ticket.eingangsdatum).toLocaleDateString('de-DE') : '–'}</strong></div>
@@ -291,6 +309,7 @@ function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () =>
             </div>
           </div>
 
+          {/* Status ändern */}
           <div>
             <Label className="text-xs text-muted-foreground mb-2 block">Status ändern</Label>
             <div className="flex flex-wrap gap-2">
@@ -302,20 +321,55 @@ function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () =>
             </div>
           </div>
 
-          {worklogs.length > 0 && (
-            <div>
-              <h4 className="text-sm font-medium mb-2">Stundenbuchungen</h4>
+          {/* Stunden eintragen */}
+          <div className="border rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-medium flex items-center gap-2"><Clock className="h-4 w-4" />Stundenbuchungen ({totalHours}h)</h4>
+              <Button size="sm" variant="outline" onClick={() => setShowStunden(!showStunden)}>
+                <Plus className="h-3.5 w-3.5 mr-1" />Stunden eintragen
+              </Button>
+            </div>
+
+            {showStunden && (
+              <div className="grid grid-cols-3 gap-2 bg-muted/30 rounded p-3">
+                <div>
+                  <Label className="text-xs">Mitarbeiter</Label>
+                  <Select value={stundenForm.employee_id} onValueChange={v => setStundenForm(f => ({ ...f, employee_id: v }))}>
+                    <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Wählen..." /></SelectTrigger>
+                    <SelectContent>
+                      {employees.map((e: any) => (
+                        <SelectItem key={e.id} value={e.id}>{e.kuerzel} – {e.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Stunden</Label>
+                  <Input className="h-8 text-xs" placeholder="1.5" value={stundenForm.stunden} onChange={e => setStundenForm(f => ({ ...f, stunden: e.target.value }))} />
+                </div>
+                <div>
+                  <Label className="text-xs">Datum</Label>
+                  <Input type="date" className="h-8 text-xs" value={stundenForm.leistungsdatum} onChange={e => setStundenForm(f => ({ ...f, leistungsdatum: e.target.value }))} />
+                </div>
+                <Button size="sm" className="col-span-3" onClick={() => addStunden.mutate()} disabled={addStunden.isPending}>
+                  Speichern
+                </Button>
+              </div>
+            )}
+
+            {worklogs.length > 0 && (
               <div className="space-y-1">
                 {worklogs.map((w: any) => (
                   <div key={w.id} className="flex justify-between text-sm bg-muted/50 rounded px-3 py-1.5">
-                    <span>{(w as any).employees?.name ?? '–'}</span>
-                    <span className="font-mono">{w.stunden}h · {w.leistungsdatum}</span>
+                    <span><strong>{w.employees?.kuerzel}</strong> – {w.employees?.name}</span>
+                    <span className="font-mono">{w.stunden}h · {w.leistungsdatum ? new Date(w.leistungsdatum).toLocaleDateString('de-DE') : '–'}</span>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
+          {/* Notizen */}
           <div>
             <h4 className="text-sm font-medium mb-2">Notizen</h4>
             <div className="flex gap-2">
@@ -332,6 +386,7 @@ function TicketDetail({ ticket, onClose, userId }: { ticket: any; onClose: () =>
             </div>
           </div>
 
+          {/* Löschen */}
           <div className="pt-2 border-t">
             <Button variant="destructive" size="sm" onClick={() => { if (confirm('Ticket wirklich löschen?')) deleteTicket.mutate(); }} disabled={deleteTicket.isPending}>
               <Trash2 className="h-4 w-4 mr-1" />Ticket löschen

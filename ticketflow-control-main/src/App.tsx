@@ -1,85 +1,57 @@
-import { Suspense, lazy } from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { MonthProvider } from "@/contexts/MonthContext";
-import AppLayout from "@/components/AppLayout";
-import AuthPage from "@/pages/AuthPage";
-import Dashboard from "@/pages/Dashboard";
-import TicketsPage from "@/pages/TicketsPage";
-import ExcelImportPage from "@/pages/ExcelImportPage";
-import MitarbeiterPage from "@/pages/MitarbeiterPage";
-import EinstellungenPage from "@/pages/EinstellungenPage";
-import NotFound from "@/pages/NotFound";
+import { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'sonner';
+import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { MonthProvider } from '@/contexts/MonthContext';
+import AppLayout from '@/components/AppLayout';
 
-const PdfRuecklauf = lazy(() => import("@/pages/PdfRuecklauf"));
+const AuthPage = lazy(() => import('@/pages/AuthPage'));
+const Dashboard = lazy(() => import('@/pages/Dashboard'));
+const TicketsPage = lazy(() => import('@/pages/TicketsPage'));
+const ExcelImportPage = lazy(() => import('@/pages/ExcelImportPage'));
+const PdfRuecklauf = lazy(() => import('@/pages/PdfRuecklauf'));
+const MitarbeiterPage = lazy(() => import('@/pages/MitarbeiterPage'));
+const AnalysePage = lazy(() => import('@/pages/AnalysePage'));
+const NotFound = lazy(() => import('@/pages/NotFound'));
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
+});
 
-function ProtectedRoutes() {
-  const { session, loading, isAdmin } = useAuth();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="text-center space-y-2">
-          <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-sm text-muted-foreground">Laden...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!session) return <AuthPage />;
-
+function AppRoutes() {
+  const { user, loading } = useAuth();
+  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>;
+  if (!user) return <AuthPage />;
   return (
     <MonthProvider>
       <AppLayout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/tickets" element={<TicketsPage />} />
-          <Route path="/import" element={<ExcelImportPage />} />
-          <Route
-            path="/pdf-ruecklauf"
-            element={
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center py-12">
-                    <div className="h-6 w-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-                  </div>
-                }
-              >
-                <PdfRuecklauf />
-              </Suspense>
-            }
-          />
-          <Route path="/mitarbeiter" element={<MitarbeiterPage />} />
-          <Route
-            path="/einstellungen"
-            element={isAdmin ? <EinstellungenPage /> : <Navigate to="/" replace />}
-          />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <Suspense fallback={<div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/tickets" element={<TicketsPage />} />
+            <Route path="/import" element={<ExcelImportPage />} />
+            <Route path="/pdf-ruecklauf" element={<PdfRuecklauf />} />
+            <Route path="/mitarbeiter" element={<MitarbeiterPage />} />
+            <Route path="/analyse" element={<AnalysePage />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Suspense>
       </AppLayout>
     </MonthProvider>
   );
 }
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AuthProvider>
-          <ProtectedRoutes />
+          <AppRoutes />
+          <Toaster richColors position="top-right" />
         </AuthProvider>
       </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
-
-export default App;
+    </QueryClientProvider>
+  );
+}

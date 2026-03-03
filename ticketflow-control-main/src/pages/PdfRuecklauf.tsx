@@ -76,19 +76,24 @@ export default function PdfRuecklauf() {
         try {
           const imageBase64 = await renderPdfPageToBase64(buffer, i);
 
-          // OCR mit Timeout
+          // OCR mit doppeltem Timeout-Schutz
+          const abortCtrl = new AbortController();
+          const abortTimer = setTimeout(() => abortCtrl.abort(), 28000);
+
           const ocrPromise = fetch('/api/ocr', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: abortCtrl.signal,
             body: JSON.stringify({ 
               imageBase64, 
               fileName: file.name, 
               pageNumber: i + 1,
               employees: (employees as any[]).map((e: any) => ({ name: e.name, kuerzel: e.kuerzel }))
             }),
-          });
+          }).finally(() => clearTimeout(abortTimer));
+
           const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error('Timeout: Seite übersprungen nach 30s')), 30000)
+            setTimeout(() => reject(new Error(`Timeout | Datei: ${file.name} | Seite: ${i + 1} – bitte manuell nachtragen`)), 30000)
           );
 
           const response = await Promise.race([ocrPromise, timeoutPromise]) as Response;

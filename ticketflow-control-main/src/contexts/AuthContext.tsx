@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { queryClient } from '@/lib/queryClient';
 
 interface AuthContextType {
   session: Session | null;
@@ -19,47 +20,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // TIMEOUT-SCHUTZ: nach 4s loading beenden egal was
-    const timeout = setTimeout(() => setLoading(false), 4000);
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          try {
-            const { data } = await supabase
-              .from('user_roles').select('role')
-              .eq('user_id', session.user.id).eq('role', 'admin').maybeSingle();
-            setIsAdmin(!!data);
-          } catch { setIsAdmin(false); }
-        } else {
-          setIsAdmin(false);
-        }
-        clearTimeout(timeout);
-        setLoading(false);
-      }
-    );
-
+    // Sofort Session aus localStorage laden - verhindert "leer" beim Reload
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      if (session?.user) {
-        supabase.from('user_roles').select('role')
-          .eq('user_id', session.user.id).eq('role', 'admin').maybeSingle()
-          .then(({ data }) => setIsAdmin(!!data))
-          .catch(() => setIsAdmin(false))
-          .finally(() => { clearTimeout(timeout); setLoading(false); });
-      } else {
-        clearTimeout(timeout);
-        setLoading(false);
-      }
-    }).catch(() => { clearTimeout(timeout); setLoading(false); });
+      setLoading(false);
+    }).catch(() => setLoading(false));
 
-    return () => { subscription.unsubscribe(); clearTimeout(timeout); };
+    // Auth-Änderungen überwachen
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        setUser(session?.user ?? null);
+        setLoading(false);
+
+        if (event === 'SIGNED_OUT') {
+          setIsAdmin(false);
+          queryClient.clear(); // Cache leeren beim Logout
+        }
+
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          queryClient.invalidateQueries(); // Alles neu laden nach Login
+        }
+      }
+    );
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const signOut = async () => { await supabase.auth.signOut(); };
+  const signOut = async () => {
+    await supabase.auth.signOut();
+  };
 
   return (
     <AuthContext.Provider value={{ session, user, isAdmin, loading, signOut }}>

@@ -76,48 +76,33 @@ export default function PdfRuecklauf() {
         try {
           const imageBase64 = await renderPdfPageToBase64(buffer, i);
 
-          // OCR mit dreifachem Timeout-Schutz - verhindert ewiges Hängen
-          const fetchWithTimeout = async (): Promise<Response> => {
-            const abortCtrl = new AbortController();
-            
-            // Watchdog 1: AbortController bricht den Fetch nach 25s ab
-            const abortTimer = setTimeout(() => abortCtrl.abort(), 25000);
-            
-            // Watchdog 2: Promise.race bricht nach 32s komplett ab
-            const hardTimeout = new Promise<never>((_, reject) =>
-              setTimeout(() => reject(new Error(`Timeout Seite ${i + 1} | Datei: ${file.name}`)), 32000)
-            );
+          // XHR mit hartem Timeout - bricht garantiert ab, kein Hängen möglich
+          const ocrResult = await new Promise<any>((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/ocr', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.timeout = 30000; // 30 Sekunden - bricht GARANTIERT ab
 
-            try {
-              const res = await Promise.race([
-                fetch('/api/ocr', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  signal: abortCtrl.signal,
-                  body: JSON.stringify({
-                    imageBase64,
-                    fileName: file.name,
-                    pageNumber: i + 1,
-                    employees: (employees as any[]).map((e: any) => ({ name: e.name, kuerzel: e.kuerzel }))
-                  }),
-                }),
-                hardTimeout,
-              ]);
-              clearTimeout(abortTimer);
-              return res as Response;
-            } catch (err) {
-              clearTimeout(abortTimer);
-              throw err;
-            }
-          };
+            xhr.ontimeout = () => reject(new Error(`Timeout Seite ${i + 1} | Datei: ${file.name} – bitte manuell nachtragen`));
+            xhr.onerror = () => reject(new Error(`Netzwerkfehler Seite ${i + 1} | Datei: ${file.name}`));
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                try { resolve(JSON.parse(xhr.responseText)); }
+                catch { reject(new Error(`JSON-Fehler Seite ${i + 1}`)); }
+              } else {
+                reject(new Error(`HTTP ${xhr.status} Seite ${i + 1}`));
+              }
+            };
 
-          const response = await fetchWithTimeout();
+            xhr.send(JSON.stringify({
+              imageBase64,
+              fileName: file.name,
+              pageNumber: i + 1,
+              employees: (employees as any[]).map((e: any) => ({ name: e.name, kuerzel: e.kuerzel }))
+            }));
+          });
 
-          if (!response.ok) {
-            throw new Error(`Proxy Fehler ${response.status}`);
-          }
-
-          const data = await response.json();
+          const data = ocrResult;
 
           if (!data.success) {
             const errMsg = `${data.error ?? 'OCR fehlgeschlagen'} | Datei: ${file.name} | Seite: ${i + 1}`;

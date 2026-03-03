@@ -102,9 +102,17 @@ export default function AnalysePage() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <div className="flex items-center gap-2">
-        <TrendingUp className="h-5 w-5" />
-        <h2 className="text-lg font-semibold">Analyse – {monthName}</h2>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <TrendingUp className="h-5 w-5" />
+          <h2 className="text-lg font-semibold">Analyse – {monthName}</h2>
+        </div>
+        <button
+          onClick={() => window.open(`/api/monatsbericht?month=${activeMonth}`, '_blank')}
+          className="flex items-center gap-2 px-4 py-2 bg-[#1e3a5f] text-white rounded-lg text-sm font-medium hover:bg-[#162d4a] transition-colors shadow-sm"
+        >
+          📄 Monatsbericht PDF
+        </button>
       </div>
 
       {/* KPIs */}

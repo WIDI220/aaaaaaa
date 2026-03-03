@@ -76,27 +76,42 @@ export default function PdfRuecklauf() {
         try {
           const imageBase64 = await renderPdfPageToBase64(buffer, i);
 
-          // OCR mit doppeltem Timeout-Schutz
-          const abortCtrl = new AbortController();
-          const abortTimer = setTimeout(() => abortCtrl.abort(), 28000);
+          // OCR mit dreifachem Timeout-Schutz - verhindert ewiges Hängen
+          const fetchWithTimeout = async (): Promise<Response> => {
+            const abortCtrl = new AbortController();
+            
+            // Watchdog 1: AbortController bricht den Fetch nach 25s ab
+            const abortTimer = setTimeout(() => abortCtrl.abort(), 25000);
+            
+            // Watchdog 2: Promise.race bricht nach 32s komplett ab
+            const hardTimeout = new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error(`Timeout Seite ${i + 1} | Datei: ${file.name}`)), 32000)
+            );
 
-          const ocrPromise = fetch('/api/ocr', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: abortCtrl.signal,
-            body: JSON.stringify({ 
-              imageBase64, 
-              fileName: file.name, 
-              pageNumber: i + 1,
-              employees: (employees as any[]).map((e: any) => ({ name: e.name, kuerzel: e.kuerzel }))
-            }),
-          }).finally(() => clearTimeout(abortTimer));
+            try {
+              const res = await Promise.race([
+                fetch('/api/ocr', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  signal: abortCtrl.signal,
+                  body: JSON.stringify({
+                    imageBase64,
+                    fileName: file.name,
+                    pageNumber: i + 1,
+                    employees: (employees as any[]).map((e: any) => ({ name: e.name, kuerzel: e.kuerzel }))
+                  }),
+                }),
+                hardTimeout,
+              ]);
+              clearTimeout(abortTimer);
+              return res as Response;
+            } catch (err) {
+              clearTimeout(abortTimer);
+              throw err;
+            }
+          };
 
-          const timeoutPromise = new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error(`Timeout | Datei: ${file.name} | Seite: ${i + 1} – bitte manuell nachtragen`)), 30000)
-          );
-
-          const response = await Promise.race([ocrPromise, timeoutPromise]) as Response;
+          const response = await fetchWithTimeout();
 
           if (!response.ok) {
             throw new Error(`Proxy Fehler ${response.status}`);

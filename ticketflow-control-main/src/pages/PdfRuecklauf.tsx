@@ -80,7 +80,12 @@ export default function PdfRuecklauf() {
           const ocrPromise = fetch('/api/ocr', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ imageBase64, fileName: file.name, pageNumber: i + 1 }),
+            body: JSON.stringify({ 
+              imageBase64, 
+              fileName: file.name, 
+              pageNumber: i + 1,
+              employees: (employees as any[]).map((e: any) => ({ name: e.name, kuerzel: e.kuerzel }))
+            }),
           });
           const timeoutPromise = new Promise<never>((_, reject) =>
             setTimeout(() => reject(new Error('Timeout: Seite übersprungen nach 30s')), 30000)

@@ -85,10 +85,11 @@ export default function PdfRuecklauf() {
     return { ids, allFound: ids.every(id => id !== null) };
   }
 
-  async function importPage(page: OcrPageResult, stundenOverride?: number, mitarbeiterOverride?: string[]) {
+  async function importPage(page: OcrPageResult, stundenOverride?: number, mitarbeiterOverride?: string[], datumOverride?: string) {
     const stunden = stundenOverride ?? page.stunden_valid!;
     const empIds = mitarbeiterOverride ?? page.mitarbeiter_ids?.filter(Boolean) as string[];
-    const today = new Date().toISOString().split('T')[0]; // IMMER heutiges Datum
+    // Leistungsdatum: vom Ticket (OCR) – das ist was auf dem Zettel steht
+    const leistungsdatum = datumOverride ?? page.leistungsdatum ?? new Date().toISOString().split('T')[0];
 
     for (const empId of empIds) {
       if (!empId) continue;
@@ -96,7 +97,7 @@ export default function PdfRuecklauf() {
         ticket_id: page.ticket_id,
         employee_id: empId,
         stunden,
-        leistungsdatum: today, // Stunden IMMER im aktuellen Monat
+        leistungsdatum, // Datum direkt vom Ticket
       });
     }
 
@@ -189,14 +190,22 @@ export default function PdfRuecklauf() {
                 const namen: string[] = [];
                 if (ocr.mitarbeiter_name) namen.push(ocr.mitarbeiter_name);
                 if (ocr.mitarbeiter_namen && Array.isArray(ocr.mitarbeiter_namen)) namen.push(...ocr.mitarbeiter_namen);
-                const uniqueNamen = [...new Set(namen.filter(Boolean))];
+                // Auch einzelne Namen die durch Komma/Schrägstrich getrennt sind aufsplitten
+                const splitNamen: string[] = [];
+                for (const n of namen) {
+                  const parts = n.split(/[,\/&+]/).map((s: string) => s.trim()).filter(Boolean);
+                  splitNamen.push(...parts);
+                }
+                const uniqueNamen = [...new Set(splitNamen.filter(Boolean))];
                 result.mitarbeiter_namen = uniqueNamen;
                 const { ids, allFound } = parseEmployees(uniqueNamen);
                 result.mitarbeiter_ids = ids;
 
+                // Wenn mehrere Namen erkannt aber nicht alle gefunden → Nachbearbeitung
                 if (!allFound || uniqueNamen.length === 0) {
                   result.needsReview = true;
-                  result.reviewReasons.push('Mitarbeiter nicht erkannt');
+                  if (uniqueNamen.length === 0) result.reviewReasons.push('Kein Mitarbeiter erkannt');
+                  else result.reviewReasons.push(`Mitarbeiter nicht vollständig erkannt (${uniqueNamen.join(', ')})`);
                 }
 
                 // Stunden validieren
@@ -218,7 +227,7 @@ export default function PdfRuecklauf() {
                   result.reviewReasons.push(`Niedrige OCR-Konfidenz (${Math.round(ocr.konfidenz*100)}%)`);
                 }
 
-                result.leistungsdatum = new Date().toISOString().split('T')[0];
+                result.leistungsdatum = ocr.leistungsdatum ?? new Date().toISOString().split('T')[0];
 
                 if (!result.needsReview) {
                   // Direkt importieren
@@ -285,7 +294,7 @@ export default function PdfRuecklauf() {
       const empIds = item.mitarbeiter_edit.map(m => m.id).filter(Boolean);
       if (empIds.length === 0) { skipped++; continue; }
       try {
-        await importPage(item, rounded, empIds);
+        await importPage(item, rounded, empIds, item.leistungsdatum ?? undefined);
         saved++;
       } catch { skipped++; }
     }
@@ -462,9 +471,14 @@ export default function PdfRuecklauf() {
 
                   {/* Datum */}
                   <div>
-                    <Label className="text-xs text-gray-500 mb-1 block">Leistungsdatum (immer heute)</Label>
-                    <Input value={item.leistungsdatum ?? new Date().toISOString().split('T')[0]} className="h-9 rounded-xl" disabled />
-                    <p className="text-xs text-gray-400 mt-1">Stunden immer im aktuellen Monat</p>
+                    <Label className="text-xs text-gray-500 mb-1 block">Leistungsdatum (vom Ticket)</Label>
+                    <Input
+                      type="date"
+                      value={item.leistungsdatum ?? new Date().toISOString().split('T')[0]}
+                      onChange={e => setReviewItems(prev => prev.map((r, i) => i === idx ? { ...r, leistungsdatum: e.target.value } : r))}
+                      className="h-9 rounded-xl"
+                    />
+                    <p className="text-xs text-gray-400 mt-1">OCR-Datum – bei Bedarf korrigieren</p>
                   </div>
                 </div>
 

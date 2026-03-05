@@ -39,13 +39,24 @@ Extrahiere folgende Felder und antworte NUR mit JSON:
 3. mitarbeiter_namen: ARRAY mit ALLEN Mitarbeitern die auf dem Ticket stehen.
    Schaue überall auf dem Zettel nach Namen oder Kürzeln – im Feld "Name:", in der Tabelle, handschriftliche Einträge.
    Es können 1, 2 oder mehr Mitarbeiter sein!
+   
+   PRIORITÄT bei der Erkennung:
+   1. KÜRZEL (2-3 Großbuchstaben wie SG, TA, FW) → sofort eindeutig zuordnen
+   2. Nachname → mit Liste abgleichen
+   3. Voller Name → direkt übernehmen
+   
    Vergleiche jeden gefundenen Namen/Kürzel mit der MITARBEITERLISTE und gib die exakten Namen zurück.
+   SEHR WICHTIG: Lieber null zurückgeben als falsch zuordnen!
+   Nur wenn du dir zu mindestens 85% sicher bist, den Namen in das Array aufnehmen.
+   Bei Unsicherheit → leeres Array [] zurückgeben, dann wird der Eintrag zur manuellen Prüfung markiert.
+   
    Beispiele: 
-   - "Werner" → ["Frank Werner"]
-   - "SG / TA" → ["Stefan Giesmann", "Tarik Alkan"]  
-   - "Giesmann, Alkan" → ["Stefan Giesmann", "Tarik Alkan"]
-   - Nur ein Name lesbar → ["Frank Werner"]
-   WICHTIG: Immer ein Array zurückgeben, auch wenn nur ein Name!
+   - "SG" → ["Stefan Giesmann"] (Kürzel = eindeutig)
+   - "SG / TA" → ["Stefan Giesmann", "Tarik Alkan"]
+   - "FW, MK" → ["Frank Werner", "Matthias Kubista"]
+   - Unleserliche Handschrift, nicht eindeutig → []
+   - Sieht aus wie "Giesm" aber könnte auch was anderes sein → [] lieber leer
+   WICHTIG: Immer ein Array zurückgeben, auch wenn leer!
 
 4. mitarbeiter_name: Den ERSTEN/HAUPTMITARBEITER als einzelner String (für Abwärtskompatibilität).
 
@@ -60,7 +71,9 @@ Extrahiere folgende Felder und antworte NUR mit JSON:
    WICHTIG: Stunden sind immer zwischen 0.25 und 8.0. Wenn du etwas wie "10" oder "17" siehst,
    ist das wahrscheinlich "1,0" oder "1,75" – lies nochmal genauer.
 
-7. konfidenz: Wie sicher bist du insgesamt? Zahl von 0.0 bis 1.0
+7. konfidenz: Wie sicher bist du bei ALLEN Feldern zusammen? Zahl von 0.0 bis 1.0
+   Sei streng: unleserliche Handschrift, unklare Zahlen oder unsichere Namen → maximal 0.7
+   Nur wenn alles klar lesbar ist → 0.9 oder höher
 
 Antworte AUSSCHLIESSLICH mit diesem JSON (keine Erklärung, kein Text davor/danach):
 {"a_nummer":"A26-01284","werkstatt":"Hochbau","mitarbeiter_namen":["Stefan Giesmann","Tarik Alkan"],"mitarbeiter_name":"Stefan Giesmann","leistungsdatum":"2026-01-06","stunden_gesamt":1.0,"konfidenz":0.9}`;

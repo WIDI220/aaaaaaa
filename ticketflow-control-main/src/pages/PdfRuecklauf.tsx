@@ -222,9 +222,9 @@ export default function PdfRuecklauf() {
                 }
 
                 // Konfidenz prüfen
-                if (ocr.konfidenz && ocr.konfidenz < 0.7) {
+                if (ocr.konfidenz && ocr.konfidenz < 0.85) {
                   result.needsReview = true;
-                  result.reviewReasons.push(`Niedrige OCR-Konfidenz (${Math.round(ocr.konfidenz*100)}%)`);
+                  result.reviewReasons.push(`Unsichere Erkennung (${Math.round(ocr.konfidenz*100)}%) – Mitarbeiter bitte prüfen`);
                 }
 
                 result.leistungsdatum = ocr.leistungsdatum ?? new Date().toISOString().split('T')[0];

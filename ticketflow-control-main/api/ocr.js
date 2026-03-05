@@ -13,7 +13,6 @@ export default async function handler(req, res) {
     const apiKey = process.env.ANTHROPIC_API_KEY || process.env.VITE_ANTHROPIC_API_KEY;
     if (!apiKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY fehlt' });
 
-    // Mitarbeiterliste für den Prompt aufbauen
     const empList = employees && employees.length > 0
       ? employees.map(e => `- ${e.name} (Kürzel: ${e.kuerzel})`).join('\n')
       : `- Frank Werner (Kürzel: FW)
@@ -37,25 +36,34 @@ Extrahiere folgende Felder und antworte NUR mit JSON:
 
 2. werkstatt: Steht nach "Werkstatt:" – z.B. "Hochbau" oder "Elektrotechnik"
 
-3. mitarbeiter_name: Der handschriftliche Name im Feld "Name:" im unteren Durchführungsbereich.
-   WICHTIG: Vergleiche was du siehst mit der MITARBEITERLISTE oben und gib den exakten Namen zurück.
-   Auch wenn die Handschrift unleserlich ist – wähle den Namen aus der Liste der am besten passt.
-   Manchmal steht nur der Nachname oder ein Kürzel – trotzdem den vollen Namen aus der Liste zurückgeben.
-   Beispiele: "Werner" → "Frank Werner", "Giesm" → "Stefan Giesmann", "SG" → "Stefan Giesmann"
+3. mitarbeiter_namen: ARRAY mit ALLEN Mitarbeitern die auf dem Ticket stehen.
+   Schaue überall auf dem Zettel nach Namen oder Kürzeln – im Feld "Name:", in der Tabelle, handschriftliche Einträge.
+   Es können 1, 2 oder mehr Mitarbeiter sein!
+   Vergleiche jeden gefundenen Namen/Kürzel mit der MITARBEITERLISTE und gib die exakten Namen zurück.
+   Beispiele: 
+   - "Werner" → ["Frank Werner"]
+   - "SG / TA" → ["Stefan Giesmann", "Tarik Alkan"]  
+   - "Giesmann, Alkan" → ["Stefan Giesmann", "Tarik Alkan"]
+   - Nur ein Name lesbar → ["Frank Werner"]
+   WICHTIG: Immer ein Array zurückgeben, auch wenn nur ein Name!
 
-4. leistungsdatum: Handschriftliches Datum in der Tabelle unter "Datum:".
+4. mitarbeiter_name: Den ERSTEN/HAUPTMITARBEITER als einzelner String (für Abwärtskompatibilität).
+
+5. leistungsdatum: Handschriftliches Datum in der Tabelle unter "Datum:".
    Umwandeln zu YYYY-MM-DD. Bei mehreren Zeilen das FRÜHESTE Datum nehmen.
    Beispiele: "06.01.26" → "2026-01-06", "6.1.26" → "2026-01-06"
 
-5. stunden_gesamt: Zahl(en) in der Spalte "Std./Stk." der Tabelle.
+6. stunden_gesamt: Zahl(en) in der Spalte "Std./Stk." der Tabelle.
    Komma ist Dezimaltrennzeichen: "0,5" → 0.5, "1,5" → 1.5, "2,5" → 2.5
    Bei mehreren ausgefüllten Zeilen: ALLE Stunden SUMMIEREN.
    Ignoriere leere Zeilen.
+   WICHTIG: Stunden sind immer zwischen 0.25 und 8.0. Wenn du etwas wie "10" oder "17" siehst,
+   ist das wahrscheinlich "1,0" oder "1,75" – lies nochmal genauer.
 
-6. konfidenz: Wie sicher bist du insgesamt? Zahl von 0.0 bis 1.0
+7. konfidenz: Wie sicher bist du insgesamt? Zahl von 0.0 bis 1.0
 
 Antworte AUSSCHLIESSLICH mit diesem JSON (keine Erklärung, kein Text davor/danach):
-{"a_nummer":"A26-01284","werkstatt":"Hochbau","mitarbeiter_name":"Stefan Giesmann","leistungsdatum":"2026-01-06","stunden_gesamt":1.0,"konfidenz":0.9}`;
+{"a_nummer":"A26-01284","werkstatt":"Hochbau","mitarbeiter_namen":["Stefan Giesmann","Tarik Alkan"],"mitarbeiter_name":"Stefan Giesmann","leistungsdatum":"2026-01-06","stunden_gesamt":1.0,"konfidenz":0.9}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25000);
@@ -71,7 +79,7 @@ Antworte AUSSCHLIESSLICH mit diesem JSON (keine Erklärung, kein Text davor/dana
         signal: controller.signal,
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 300,
+          max_tokens: 400,
           messages: [{
             role: 'user',
             content: [
@@ -101,6 +109,12 @@ Antworte AUSSCHLIESSLICH mit diesem JSON (keine Erklärung, kein Text davor/dana
       }
 
       const parsed = JSON.parse(jsonMatch[0]);
+
+      // Sicherstellen dass mitarbeiter_namen immer ein Array ist
+      if (!parsed.mitarbeiter_namen || !Array.isArray(parsed.mitarbeiter_namen)) {
+        parsed.mitarbeiter_namen = parsed.mitarbeiter_name ? [parsed.mitarbeiter_name] : [];
+      }
+
       return res.status(200).json({ success: true, result: parsed });
 
     } catch (fetchErr) {

@@ -32,51 +32,50 @@ ${empList}
 
 Extrahiere folgende Felder und antworte NUR mit JSON:
 
-1. a_nummer: Steht nach "Auftragsnr.:" – Format A26-XXXXX oder A25-XXXXX (immer 5 Ziffern). Beispiel: "A26-01284"
+1. a_nummer: Steht nach "Auftragsnr.:" – Format A26-XXXXX oder A25-XXXXX (immer 5 Ziffern).
+   Beispiel: "A26-01284"
 
 2. werkstatt: Steht nach "Werkstatt:" – z.B. "Hochbau" oder "Elektrotechnik"
 
 3. mitarbeiter_namen: ARRAY mit ALLEN Mitarbeitern die auf dem Ticket stehen.
-   Schaue überall auf dem Zettel nach Namen oder Kürzeln – im Feld "Name:", in der Tabelle, handschriftliche Einträge.
-   Es können 1, 2 oder mehr Mitarbeiter sein!
+   Schaue im Feld "Name:", in der Tabelle und überall nach handschriftlichen Einträgen oder Stempeln.
+   Es können 1, 2 oder mehr Mitarbeiter sein.
    
-   PRIORITÄT bei der Erkennung:
-   1. KÜRZEL (2-3 Großbuchstaben wie SG, TA, FW) → sofort eindeutig zuordnen
-   2. Nachname → mit Liste abgleichen
-   3. Voller Name → direkt übernehmen
+   Erkennungsregeln (in dieser Reihenfolge):
+   - Stempel oder Kürzel (SG, TA, FW etc.) → sofort eindeutig, direkt zuordnen, konfidenz hoch
+   - Nachname allein (Werner, Giesmann etc.) → mit Liste abgleichen
+   - Voller Name → direkt übernehmen
+   - Unleserlich aber ähnelt einem Kürzel → trotzdem best-match aus der Liste nehmen
    
-   Vergleiche jeden gefundenen Namen/Kürzel mit der MITARBEITERLISTE und gib die exakten Namen zurück.
-   SEHR WICHTIG: Lieber null zurückgeben als falsch zuordnen!
-   Nur wenn du dir zu mindestens 85% sicher bist, den Namen in das Array aufnehmen.
-   Bei Unsicherheit → leeres Array [] zurückgeben, dann wird der Eintrag zur manuellen Prüfung markiert.
+   WICHTIG: Nimm immer den best-match aus der Mitarbeiterliste.
+   Gib NIEMALS einen leeren Array zurück wenn irgendein Name/Kürzel erkennbar ist.
+   Lieber eine Zuordnung versuchen als leer lassen – der Nutzer kann im Nachbearbeitungsdialog korrigieren.
    
-   Beispiele: 
-   - "SG" → ["Stefan Giesmann"] (Kürzel = eindeutig)
+   Beispiele:
+   - "SG" → ["Stefan Giesmann"]
    - "SG / TA" → ["Stefan Giesmann", "Tarik Alkan"]
-   - "FW, MK" → ["Frank Werner", "Matthias Kubista"]
-   - Unleserliche Handschrift, nicht eindeutig → []
-   - Sieht aus wie "Giesm" aber könnte auch was anderes sein → [] lieber leer
-   WICHTIG: Immer ein Array zurückgeben, auch wenn leer!
+   - "Giesmann" → ["Stefan Giesmann"]
+   - Stempel mit "Büter" → ["Sigrid Büter"]
+   - Unleserlich, sieht aus wie "FW" → ["Frank Werner"]
 
-4. mitarbeiter_name: Den ERSTEN/HAUPTMITARBEITER als einzelner String (für Abwärtskompatibilität).
+4. mitarbeiter_name: Den ersten Mitarbeiter als einzelner String (für Abwärtskompatibilität).
 
 5. leistungsdatum: Handschriftliches Datum in der Tabelle unter "Datum:".
    Umwandeln zu YYYY-MM-DD. Bei mehreren Zeilen das FRÜHESTE Datum nehmen.
-   Beispiele: "06.01.26" → "2026-01-06", "6.1.26" → "2026-01-06"
+   Beispiele: "06.01.26" → "2026-01-06", "6.1.26" → "2026-01-06", "15.12.25" → "2025-12-15"
 
 6. stunden_gesamt: Zahl(en) in der Spalte "Std./Stk." der Tabelle.
    Komma ist Dezimaltrennzeichen: "0,5" → 0.5, "1,5" → 1.5, "2,5" → 2.5
    Bei mehreren ausgefüllten Zeilen: ALLE Stunden SUMMIEREN.
    Ignoriere leere Zeilen.
-   WICHTIG: Stunden sind immer zwischen 0.25 und 8.0. Wenn du etwas wie "10" oder "17" siehst,
-   ist das wahrscheinlich "1,0" oder "1,75" – lies nochmal genauer.
+   Stunden sind fast immer zwischen 0.25 und 5.0.
+   Wenn du "10" siehst lies nochmal – wahrscheinlich "1,0". Wenn "17" → wahrscheinlich "1,75".
 
-7. konfidenz: Wie sicher bist du bei ALLEN Feldern zusammen? Zahl von 0.0 bis 1.0
-   Sei streng: unleserliche Handschrift, unklare Zahlen oder unsichere Namen → maximal 0.7
-   Nur wenn alles klar lesbar ist → 0.9 oder höher
+7. konfidenz: Gesamtsicherheit von 0.0 bis 1.0.
+   Stempel/Kürzel = 0.95, klare Handschrift = 0.85, leicht unleserlich = 0.75, sehr unleserlich = 0.60
 
-Antworte AUSSCHLIESSLICH mit diesem JSON (keine Erklärung, kein Text davor/danach):
-{"a_nummer":"A26-01284","werkstatt":"Hochbau","mitarbeiter_namen":["Stefan Giesmann","Tarik Alkan"],"mitarbeiter_name":"Stefan Giesmann","leistungsdatum":"2026-01-06","stunden_gesamt":1.0,"konfidenz":0.9}`;
+Antworte AUSSCHLIESSLICH mit diesem JSON:
+{"a_nummer":"A26-01284","werkstatt":"Hochbau","mitarbeiter_namen":["Stefan Giesmann"],"mitarbeiter_name":"Stefan Giesmann","leistungsdatum":"2026-01-06","stunden_gesamt":1.0,"konfidenz":0.9}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 25000);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,6 +25,14 @@ const PAGE_SIZE = 50;
 
 export default function TicketsPage() {
   const { user } = useAuth();
+
+  // EmailJS laden
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js';
+    script.onload = () => { (window as any).emailjs.init('y7g5YcPgorv_NmH0y'); };
+    document.head.appendChild(script);
+  }, []);
   const { activeMonth } = useMonth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');

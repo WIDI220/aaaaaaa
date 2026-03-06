@@ -1,5 +1,5 @@
 // WIDI Ticketsystem v2.1 - EmailJS
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
+import emailjs from '@emailjs/browser';
 import { Search, ChevronLeft, ChevronRight, Trash2, Pencil, Clock, Plus, AlertTriangle, Mail, Send } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -27,13 +28,7 @@ const PAGE_SIZE = 50;
 export default function TicketsPage() {
   const { user } = useAuth();
 
-  // EmailJS laden
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js';
-    script.onload = () => { (window as any).emailjs.init('y7g5YcPgorv_NmH0y'); };
-    document.head.appendChild(script);
-  }, []);
+
   const { activeMonth } = useMonth();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -265,7 +260,8 @@ export default function TicketsPage() {
                     `• ${t.a_nummer} | ${t.gewerk ?? '–'} | ${STATUS_LABELS[t.status] ?? t.status} | Eingang: ${t.eingangsdatum ? new Date(t.eingangsdatum).toLocaleDateString('de-DE') : '–'}`
                   ).join('\n');
                   const content = `${emailNote ? 'Anliegen:\n' + emailNote + '\n\n' : ''}Betroffene Tickets (${selectedTickets.length}):\n${ticketLines}\n\n---\nGesendet von WIDI Controlling System\n${new Date().toLocaleDateString('de-DE')}`;
-                  await (window as any).emailjs.send('service_puf26v4', 'template_s043jzj', {
+                  emailjs.init('y7g5YcPgorv_NmH0y');
+                  await emailjs.send('service_22oktze', 'template_s043jzj', {
                     to_email: emailTo,
                     to_name: emailTo,
                     subject: emailSubject,

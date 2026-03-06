@@ -1,3 +1,4 @@
+// WIDI Ticketsystem v2.1 - EmailJS
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -253,31 +254,29 @@ export default function TicketsPage() {
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowEmail(false)}>Abbrechen</Button>
               <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700" disabled={sendingEmail || emailSent}
               onClick={async () => {
-                const ticketLines = tickets
-                  .filter((t: any) => selected.has(t.id))
-                  .map((t: any) => {
-                    const st = STATUS_OPTIONS.find(s => s.value === t.status);
-                    return `• ${t.a_nummer} | ${t.gewerk} | ${st?.label ?? t.status} | Eingang: ${t.eingangsdatum ? new Date(t.eingangsdatum).toLocaleDateString('de-DE') : '–'}`;
-                  }).join('\n');
-setSendingEmail(true);
-                const selectedTickets = tickets
-                  .filter((t: any) => selected.has(t.id))
-                  .map((t: any) => {
-                    const tW = (t.ticket_worklogs ?? []);
-                    const ma = [...new Set(tW.map((w: any) => w.employees?.kuerzel).filter(Boolean))].join(', ');
-                    return { a_nummer: t.a_nummer, gewerk: t.gewerk, status: t.status, eingangsdatum: t.eingangsdatum, mitarbeiter: ma };
-                  });
+                setSendingEmail(true);
                 try {
-                  const res = await fetch('/api/send-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ to: emailTo, subject: emailSubject, note: emailNote, tickets: selectedTickets, senderName: 'WIDI Controlling' }),
+                  const STATUS_LABELS: Record<string,string> = {
+                    'in_bearbeitung':'In Bearbeitung','erledigt':'Erledigt',
+                    'zur_unterschrift':'Zur Unterschrift','abrechenbar':'Abrechenbar','abgerechnet':'Abgerechnet'
+                  };
+                  const selectedTickets = tickets.filter((t: any) => selected.has(t.id));
+                  const ticketLines = selectedTickets.map((t: any) =>
+                    `• ${t.a_nummer} | ${t.gewerk ?? '–'} | ${STATUS_LABELS[t.status] ?? t.status} | Eingang: ${t.eingangsdatum ? new Date(t.eingangsdatum).toLocaleDateString('de-DE') : '–'}`
+                  ).join('\n');
+                  const content = `${emailNote ? 'Anliegen:\n' + emailNote + '\n\n' : ''}Betroffene Tickets (${selectedTickets.length}):\n${ticketLines}\n\n---\nGesendet von WIDI Controlling System\n${new Date().toLocaleDateString('de-DE')}`;
+                  await (window as any).emailjs.send('service_puf26v4', 'template_s043jzj', {
+                    to_email: emailTo,
+                    to_name: emailTo,
+                    subject: emailSubject,
+                    content,
                   });
-                  const data = await res.json();
-                  if (data.success) { setEmailSent(true); toast.success('E-Mail erfolgreich gesendet!'); setTimeout(() => { setShowEmail(false); setEmailSent(false); setEmailTo(''); setEmailNote(''); }, 2000); }
-                  else toast.error('Fehler: ' + (data.error ?? 'Unbekannt'));
-                } catch (e: any) { toast.error('Fehler: ' + e.message); }
-                finally { setSendingEmail(false); }
+                  setEmailSent(true);
+                  toast.success('E-Mail erfolgreich gesendet!');
+                  setTimeout(() => { setShowEmail(false); setEmailSent(false); setEmailTo(''); setEmailNote(''); setEmailSubject(''); }, 2000);
+                } catch (e: any) {
+                  toast.error('E-Mail Fehler: ' + (e?.text ?? e?.message ?? 'Unbekannt'));
+                } finally { setSendingEmail(false); }
               }}>
                 {sendingEmail ? 'Sendet...' : emailSent ? '✅ Gesendet!' : <><Send className="h-4 w-4 mr-1" />E-Mail senden</>}
               </Button>

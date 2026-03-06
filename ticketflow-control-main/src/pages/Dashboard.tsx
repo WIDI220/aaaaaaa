@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useMonth } from '@/contexts/MonthContext';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Ticket, Clock, CheckCircle, AlertCircle, TrendingUp, ArrowUpRight } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from 'recharts';
+import { Ticket, Clock, CheckCircle, AlertCircle, TrendingUp, ArrowUpRight, Building2, Zap } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: 'in_bearbeitung', label: 'In Bearbeitung', bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700', dot: 'bg-blue-500' },
@@ -11,7 +11,6 @@ const STATUS_OPTIONS = [
   { value: 'abrechenbar', label: 'Abrechenbar', bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-700', dot: 'bg-orange-500' },
   { value: 'abgerechnet', label: 'Abgerechnet', bg: 'bg-gray-50', border: 'border-gray-200', text: 'text-gray-600', dot: 'bg-gray-400' },
 ];
-
 const PIE_COLORS = ['#3b82f6','#10b981','#f59e0b','#f97316','#6b7280'];
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -32,145 +31,234 @@ export default function Dashboard() {
   const to = `${year}-${month}-${String(lastDay).padStart(2,'0')}`;
   const monthName = new Date(parseInt(year), parseInt(month)-1, 1).toLocaleString('de-DE', { month: 'long', year: 'numeric' });
 
-  const { data: tickets = [] } = useQuery({ queryKey: ['tickets', activeMonth], queryFn: async () => { const { data } = await supabase.from('tickets').select('*').gte('eingangsdatum', from).lte('eingangsdatum', to); return data ?? []; } });
-  const { data: allTickets = [] } = useQuery({ queryKey: ['tickets-all'], queryFn: async () => { const { data } = await supabase.from('tickets').select('status, gewerk'); return data ?? []; } });
-  const { data: worklogs = [] } = useQuery({ queryKey: ['worklogs', activeMonth], queryFn: async () => { const { data } = await supabase.from('ticket_worklogs').select('*, employees(name, gewerk)').gte('leistungsdatum', from).lte('leistungsdatum', to); return data ?? []; } });
+  // Alle Daten NUR für den aktiven Monat
+  const { data: tickets = [] } = useQuery({
+    queryKey: ['tickets-dash', activeMonth],
+    queryFn: async () => {
+      const { data } = await supabase.from('tickets').select('*').gte('eingangsdatum', from).lte('eingangsdatum', to);
+      return data ?? [];
+    },
+  });
 
-  const totalTickets = tickets.length;
-  const totalHours = worklogs.reduce((s: number, w: any) => s + Number(w.stunden ?? 0), 0);
-  const openTickets = tickets.filter((t: any) => t.status === 'in_bearbeitung').length;
-  const doneTickets = tickets.filter((t: any) => t.status === 'abgerechnet').length;
-  const pieData = STATUS_OPTIONS.map(s => ({ name: s.label, value: tickets.filter((t: any) => t.status === s.value).length })).filter(d => d.value > 0);
-  const gewerkData = [{ name: 'Hochbau', tickets: tickets.filter((t: any) => t.gewerk === 'Hochbau').length }, { name: 'Elektro', tickets: tickets.filter((t: any) => t.gewerk === 'Elektro').length }];
-  const empHours = new Map<string, number>();
-  worklogs.forEach((w: any) => { const n = w.employees?.name ?? 'Unbekannt'; empHours.set(n, (empHours.get(n) ?? 0) + Number(w.stunden ?? 0)); });
-  const employeeData = Array.from(empHours.entries()).map(([name, stunden]) => ({ name, stunden: Math.round(stunden * 10) / 10 })).sort((a, b) => b.stunden - a.stunden);
+  const { data: worklogs = [] } = useQuery({
+    queryKey: ['worklogs-dash', activeMonth],
+    queryFn: async () => {
+      const { data } = await supabase.from('ticket_worklogs')
+        .select('*, employees(name, kuerzel, gewerk)')
+        .gte('leistungsdatum', from).lte('leistungsdatum', to);
+      return data ?? [];
+    },
+  });
+
+  const { data: employees = [] } = useQuery({
+    queryKey: ['employees'],
+    queryFn: async () => { const { data } = await supabase.from('employees').select('*').eq('aktiv', true); return data ?? []; },
+  });
+
+  // Vormonat für Vergleich
+  const prevDate = new Date(parseInt(year), parseInt(month) - 2, 1);
+  const prevYear = prevDate.getFullYear();
+  const prevMonth = String(prevDate.getMonth() + 1).padStart(2, '0');
+  const prevFrom = `${prevYear}-${prevMonth}-01`;
+  const prevLastDay = new Date(prevYear, prevDate.getMonth() + 1, 0).getDate();
+  const prevTo = `${prevYear}-${prevMonth}-${String(prevLastDay).padStart(2,'0')}`;
+
+  const { data: prevWorklogs = [] } = useQuery({
+    queryKey: ['prev-worklogs-dash', activeMonth],
+    queryFn: async () => {
+      const { data } = await supabase.from('ticket_worklogs').select('stunden').gte('leistungsdatum', prevFrom).lte('leistungsdatum', prevTo);
+      return data ?? [];
+    },
+  });
+
+  const t = tickets as any[];
+  const w = worklogs as any[];
+  const e = employees as any[];
+  const pw = prevWorklogs as any[];
+
+  const totalH = w.reduce((s: number, x: any) => s + Number(x.stunden ?? 0), 0);
+  const prevTotalH = pw.reduce((s: number, x: any) => s + Number(x.stunden ?? 0), 0);
+  const erledigtCount = t.filter((x: any) => ['erledigt','abrechenbar','abgerechnet'].includes(x.status)).length;
+  const inBearbeitungCount = t.filter((x: any) => x.status === 'in_bearbeitung').length;
+  const abgerechnetCount = t.filter((x: any) => x.status === 'abgerechnet').length;
+  const stundenTrend = prevTotalH > 0 ? ((totalH - prevTotalH) / prevTotalH * 100).toFixed(1) : null;
+
+  // Status Verteilung (nur aktueller Monat)
+  const statusData = STATUS_OPTIONS.map(s => ({
+    name: s.label,
+    value: t.filter((x: any) => x.status === s.value).length,
+    pct: t.length > 0 ? Math.round(t.filter((x: any) => x.status === s.value).length / t.length * 100) : 0,
+    ...s,
+  })).filter(s => s.value > 0);
+
+  // Gewerk Vergleich (nur aktueller Monat)
+  const hochbauTickets = t.filter((x: any) => x.gewerk === 'Hochbau');
+  const elektroTickets = t.filter((x: any) => x.gewerk === 'Elektro');
+  const hochbauH = w.filter((x: any) => x.employees?.gewerk === 'Hochbau').reduce((s: number, x: any) => s + Number(x.stunden ?? 0), 0);
+  const elektroH = w.filter((x: any) => x.employees?.gewerk === 'Elektro').reduce((s: number, x: any) => s + Number(x.stunden ?? 0), 0);
+  const hochbauErledigt = hochbauTickets.filter((x: any) => ['erledigt','abrechenbar','abgerechnet'].includes(x.status)).length;
+  const elektroErledigt = elektroTickets.filter((x: any) => ['erledigt','abrechenbar','abgerechnet'].includes(x.status)).length;
+
+  const gewerkData = [
+    { name: 'Hochbau', Tickets: hochbauTickets.length, Stunden: Math.round(hochbauH * 10) / 10, Erledigt: hochbauErledigt },
+    { name: 'Elektro', Tickets: elektroTickets.length, Stunden: Math.round(elektroH * 10) / 10, Erledigt: elektroErledigt },
+  ];
+
+  // Mitarbeiter Stunden (nur aktueller Monat)
+  const empStunden = e.map((emp: any) => {
+    const logs = w.filter((x: any) => x.employee_id === emp.id);
+    const stunden = logs.reduce((s: number, x: any) => s + Number(x.stunden ?? 0), 0);
+    return { name: emp.kuerzel, stunden: Math.round(stunden * 10) / 10 };
+  }).filter((x: any) => x.stunden > 0).sort((a: any, b: any) => b.stunden - a.stunden);
+
+  const maxEmpH = Math.max(...empStunden.map((e: any) => e.stunden), 1);
 
   const kpis = [
-    { icon: Ticket, label: 'Tickets im Monat', value: totalTickets, sub: monthName, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100' },
-    { icon: Clock, label: 'Stunden gesamt', value: `${totalHours.toFixed(1)}h`, sub: 'Monat', color: 'text-sky-600', bg: 'bg-sky-50', border: 'border-sky-100' },
-    { icon: AlertCircle, label: 'In Bearbeitung', value: openTickets, sub: `${totalTickets > 0 ? Math.round(openTickets/totalTickets*100) : 0}% aller Tickets`, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100' },
-    { icon: CheckCircle, label: 'Abgerechnet', value: doneTickets, sub: `${totalTickets > 0 ? Math.round(doneTickets/totalTickets*100) : 0}% fertig`, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100' },
+    {
+      label: 'Tickets gesamt', value: t.length, icon: Ticket,
+      sub: `${inBearbeitungCount} offen`, color: 'text-blue-600', bg: 'bg-blue-50', border: 'border-blue-100',
+      trend: null,
+    },
+    {
+      label: 'Stunden gesamt', value: `${totalH.toFixed(1)}h`, icon: Clock,
+      sub: stundenTrend ? `${parseFloat(stundenTrend) >= 0 ? '▲' : '▼'} ${Math.abs(parseFloat(stundenTrend))}% zum Vormonat` : 'kein Vormonat',
+      color: 'text-purple-600', bg: 'bg-purple-50', border: 'border-purple-100',
+      trend: stundenTrend,
+    },
+    {
+      label: 'In Bearbeitung', value: inBearbeitungCount, icon: AlertCircle,
+      sub: `${t.length > 0 ? Math.round(inBearbeitungCount/t.length*100) : 0}% des Monats`,
+      color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-100',
+      trend: null,
+    },
+    {
+      label: 'Abgerechnet', value: abgerechnetCount, icon: CheckCircle,
+      sub: `${erledigtCount} erledigt gesamt`,
+      color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-100',
+      trend: null,
+    },
   ];
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
-          <p className="text-sm text-gray-500 mt-0.5">{monthName} · Übersicht</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-0.5">{monthName} · {t.length} Tickets</p>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map(({ icon: Icon, label, value, sub, color, bg, border }) => (
-          <div key={label} className={`bg-white rounded-2xl border ${border} shadow-sm p-5 hover:shadow-md transition-shadow`}>
-            <div className="flex items-start justify-between mb-3">
-              <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center`}>
-                <Icon className={`h-5 w-5 ${color}`} />
-              </div>
-              <ArrowUpRight className="h-4 w-4 text-gray-300" />
+      {/* KPIs */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {kpis.map(({ label, value, icon: Icon, sub, color, bg, border, trend }) => (
+          <div key={label} className={`bg-white rounded-2xl border ${border} shadow-sm p-5 relative overflow-hidden`}>
+            <div className={`w-9 h-9 ${bg} rounded-xl flex items-center justify-center mb-3`}>
+              <Icon className={`h-5 w-5 ${color}`} />
             </div>
             <p className="text-3xl font-bold text-gray-900 tracking-tight">{value}</p>
-            <p className="text-sm font-medium text-gray-700 mt-0.5">{label}</p>
-            <p className="text-xs text-gray-400 mt-1">{sub}</p>
+            <p className="text-xs font-medium text-gray-600 mt-1">{label}</p>
+            <p className={`text-xs mt-0.5 ${trend !== null ? (parseFloat(trend) >= 0 ? 'text-emerald-500' : 'text-red-400') : 'text-gray-400'}`}>{sub}</p>
+            <ArrowUpRight className="absolute top-4 right-4 h-4 w-4 text-gray-200" />
           </div>
         ))}
       </div>
 
       {/* Status Kacheln */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Status-Verteilung · {monthName}</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {STATUS_OPTIONS.map(s => {
-            const count = tickets.filter((t: any) => t.status === s.value).length;
-            const pct = totalTickets ? Math.round(count/totalTickets*100) : 0;
-            return (
-              <div key={s.value} className={`${s.bg} border ${s.border} rounded-xl p-3 text-center`}>
-                <div className={`w-2 h-2 rounded-full ${s.dot} mx-auto mb-2`} />
-                <p className={`text-2xl font-bold ${s.text}`}>{count}</p>
-                <p className={`text-xs font-medium ${s.text} mt-1 leading-tight`}>{s.label}</p>
-                <p className={`text-xs ${s.text} opacity-60 mt-0.5`}>{pct}%</p>
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        {STATUS_OPTIONS.map((s, i) => {
+          const count = t.filter((x: any) => x.status === s.value).length;
+          const pct = t.length > 0 ? Math.round(count / t.length * 100) : 0;
+          return (
+            <div key={s.value} className={`bg-white rounded-2xl border ${s.border} shadow-sm p-4`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-2.5 h-2.5 rounded-full ${s.dot}`} />
+                <span className="text-xs font-medium text-gray-500">{s.label}</span>
               </div>
-            );
-          })}
-        </div>
+              <p className="text-2xl font-bold text-gray-900">{count}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{pct}%</p>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Charts */}
+      {/* Charts Reihe 1 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        {/* Gewerk Vergleich - vollständig */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Gewerk-Vergleich</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-0.5">Gewerk Vergleich</h2>
+          <p className="text-xs text-gray-400 mb-4">Tickets · Stunden · Erledigt – {monthName}</p>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={gewerkData} barSize={40}>
+            <BarChart data={gewerkData} barGap={4}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
               <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#6b7280' }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="tickets" name="Tickets" radius={[8,8,0,0]} fill="#1e3a5f" />
+              <Legend wrapperStyle={{ fontSize: 11, color: '#6b7280' }} />
+              <Bar dataKey="Tickets" fill="#3b82f6" radius={[5,5,0,0]} />
+              <Bar dataKey="Stunden" fill="#8b5cf6" radius={[5,5,0,0]} />
+              <Bar dataKey="Erledigt" fill="#10b981" radius={[5,5,0,0]} />
             </BarChart>
           </ResponsiveContainer>
+          {/* Gewerk Detail */}
+          <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-50">
+            {[
+              { name: 'Hochbau', icon: Building2, tickets: hochbauTickets.length, stunden: hochbauH, erledigt: hochbauErledigt, color: '#3b82f6' },
+              { name: 'Elektro', icon: Zap, tickets: elektroTickets.length, stunden: elektroH, erledigt: elektroErledigt, color: '#8b5cf6' },
+            ].map(g => (
+              <div key={g.name} className="bg-gray-50 rounded-xl p-3">
+                <div className="flex items-center gap-1.5 mb-2">
+                  <g.icon className="h-3.5 w-3.5" style={{ color: g.color }} />
+                  <span className="text-xs font-semibold text-gray-700">{g.name}</span>
+                </div>
+                <div className="space-y-0.5 text-xs text-gray-500">
+                  <div className="flex justify-between"><span>Tickets</span><strong className="text-gray-700">{g.tickets}</strong></div>
+                  <div className="flex justify-between"><span>Stunden</span><strong className="text-gray-700">{g.stunden}h</strong></div>
+                  <div className="flex justify-between"><span>Erledigt</span><strong className="text-emerald-600">{g.erledigt}</strong></div>
+                  <div className="flex justify-between"><span>Quote</span><strong style={{ color: g.color }}>{g.tickets > 0 ? Math.round(g.erledigt/g.tickets*100) : 0}%</strong></div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
+
+        {/* Status PieChart */}
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-4">Status (Pie)</h2>
-          {pieData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={200}>
+          <h2 className="text-sm font-semibold text-gray-700 mb-0.5">Status Verteilung</h2>
+          <p className="text-xs text-gray-400 mb-2">{monthName}</p>
+          {t.length === 0 ? (
+            <div className="h-40 flex items-center justify-center text-gray-300 text-sm">Keine Tickets</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75} innerRadius={35} paddingAngle={3}>
-                  {pieData.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                <Pie data={statusData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={45} outerRadius={75} paddingAngle={3}>
+                  {statusData.map((_: any, i: number) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
                 </Pie>
-                <Tooltip content={<CustomTooltip />} />
+                <Tooltip formatter={(v: any, n: any) => [`${v} Tickets`, n]} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
-          ) : <div className="h-[200px] flex items-center justify-center text-gray-400 text-sm">Keine Daten für {monthName}</div>}
+          )}
         </div>
       </div>
 
-      {/* Mitarbeiter + Gesamtbestand */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {employeeData.length > 0 && (
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-            <h2 className="text-sm font-semibold text-gray-700 mb-4">Mitarbeiter-Stunden · {monthName}</h2>
-            <div className="space-y-2.5">
-              {employeeData.map((e, i) => {
-                const max = employeeData[0]?.stunden ?? 1;
-                return (
-                  <div key={e.name} className="flex items-center gap-3">
-                    <span className="text-xs text-gray-400 w-4 text-right font-mono">{i+1}</span>
-                    <span className="text-sm text-gray-700 w-28 truncate font-medium">{e.name}</span>
-                    <div className="flex-1 bg-gray-100 rounded-full h-2">
-                      <div className="h-2 rounded-full bg-[#1e3a5f] transition-all" style={{ width: `${(e.stunden/max)*100}%` }} />
-                    </div>
-                    <span className="text-xs font-mono font-semibold text-gray-700 w-12 text-right">{e.stunden}h</span>
-                  </div>
-                );
-              })}
-            </div>
+      {/* Mitarbeiter Stunden */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <h2 className="text-sm font-semibold text-gray-700 mb-0.5">Mitarbeiter Stunden</h2>
+        <p className="text-xs text-gray-400 mb-4">{monthName} – nur gebuchte Stunden dieses Monats</p>
+        {empStunden.length === 0 ? (
+          <p className="text-sm text-gray-300 py-4 text-center">Keine Stunden für {monthName}</p>
+        ) : (
+          <div className="space-y-2.5">
+            {empStunden.map((emp: any, i: number) => (
+              <div key={emp.name} className="flex items-center gap-3">
+                <span className="font-mono font-bold text-sm w-8 text-gray-700">{emp.name}</span>
+                <div className="flex-1 bg-gray-100 rounded-full h-2.5">
+                  <div className="h-2.5 rounded-full transition-all" style={{ width: `${emp.stunden/maxEmpH*100}%`, background: `hsl(${210 + i*25}, 70%, 50%)` }} />
+                </div>
+                <span className="font-mono text-sm font-semibold text-gray-700 w-12 text-right">{emp.stunden}h</span>
+              </div>
+            ))}
           </div>
         )}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <TrendingUp className="h-4 w-4 text-gray-500" />
-            <h2 className="text-sm font-semibold text-gray-700">Gesamtbestand (alle Monate)</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-2 mb-3">
-            {STATUS_OPTIONS.map(s => {
-              const count = allTickets.filter((t: any) => t.status === s.value).length;
-              return (
-                <div key={s.value} className={`${s.bg} border ${s.border} rounded-xl px-3 py-2 flex items-center justify-between`}>
-                  <span className={`text-xs font-medium ${s.text}`}>{s.label}</span>
-                  <span className={`text-lg font-bold ${s.text}`}>{count}</span>
-                </div>
-              );
-            })}
-          </div>
-          <div className="bg-gray-50 rounded-xl px-3 py-2 flex items-center justify-between">
-            <span className="text-xs font-medium text-gray-500">Gesamt alle Tickets</span>
-            <span className="text-lg font-bold text-gray-800">{allTickets.length}</span>
-          </div>
-        </div>
       </div>
     </div>
   );

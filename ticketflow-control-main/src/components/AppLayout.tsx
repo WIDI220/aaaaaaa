@@ -2,7 +2,7 @@ import { ReactNode } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { useMonth } from '@/contexts/MonthContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { LayoutDashboard, Ticket, FileSpreadsheet, FileText, Users, TrendingUp, LogOut, ChevronLeft, ChevronRight, Building2 } from 'lucide-react';
+import { LayoutDashboard, Ticket, FileSpreadsheet, FileText, Users, TrendingUp, LogOut, ChevronLeft, ChevronRight, Building2, ClipboardCheck } from 'lucide-react';
 
 function MonthStepper() {
   const { activeMonth, setActiveMonth } = useMonth();

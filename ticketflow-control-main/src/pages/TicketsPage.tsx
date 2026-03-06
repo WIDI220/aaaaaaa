@@ -39,6 +39,8 @@ export default function TicketsPage() {
   const [emailTo, setEmailTo] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailNote, setEmailNote] = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['tickets-list', search, statusFilter, gewerkFilter, page, activeMonth, monthFilter],
@@ -241,18 +243,35 @@ export default function TicketsPage() {
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowEmail(false)}>Abbrechen</Button>
-              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700" onClick={() => {
+              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700" disabled={sendingEmail || emailSent}
+              onClick={async () => {
                 const ticketLines = tickets
                   .filter((t: any) => selected.has(t.id))
                   .map((t: any) => {
                     const st = STATUS_OPTIONS.find(s => s.value === t.status);
                     return `• ${t.a_nummer} | ${t.gewerk} | ${st?.label ?? t.status} | Eingang: ${t.eingangsdatum ? new Date(t.eingangsdatum).toLocaleDateString('de-DE') : '–'}`;
                   }).join('\n');
-                const body = `${emailNote ? emailNote + '\n\n' : ''}Betroffene Tickets (${selected.size}):\n${ticketLines}\n\nMit freundlichen Grüßen\nWIDI Gebäudeservice GmbH`;
-                window.location.href = `mailto:${emailTo}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(body)}`;
-                setShowEmail(false);
+setSendingEmail(true);
+                const selectedTickets = tickets
+                  .filter((t: any) => selected.has(t.id))
+                  .map((t: any) => {
+                    const tW = (t.ticket_worklogs ?? []);
+                    const ma = [...new Set(tW.map((w: any) => w.employees?.kuerzel).filter(Boolean))].join(', ');
+                    return { a_nummer: t.a_nummer, gewerk: t.gewerk, status: t.status, eingangsdatum: t.eingangsdatum, mitarbeiter: ma };
+                  });
+                try {
+                  const res = await fetch('/api/send-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ to: emailTo, subject: emailSubject, note: emailNote, tickets: selectedTickets, senderName: 'WIDI Controlling' }),
+                  });
+                  const data = await res.json();
+                  if (data.success) { setEmailSent(true); toast.success('E-Mail erfolgreich gesendet!'); setTimeout(() => { setShowEmail(false); setEmailSent(false); setEmailTo(''); setEmailNote(''); }, 2000); }
+                  else toast.error('Fehler: ' + (data.error ?? 'Unbekannt'));
+                } catch (e: any) { toast.error('Fehler: ' + e.message); }
+                finally { setSendingEmail(false); }
               }}>
-                <Send className="h-4 w-4 mr-1" /> E-Mail öffnen
+                {sendingEmail ? 'Sendet...' : emailSent ? '✅ Gesendet!' : <><Send className="h-4 w-4 mr-1" />E-Mail senden</>}
               </Button>
             </div>
           </div>

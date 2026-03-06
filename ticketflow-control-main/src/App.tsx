@@ -14,6 +14,7 @@ const ExcelImportPage = lazy(() => import('@/pages/ExcelImportPage'));
 const PdfRuecklauf = lazy(() => import('@/pages/PdfRuecklauf'));
 const MitarbeiterPage = lazy(() => import('@/pages/MitarbeiterPage'));
 const AnalysePage = lazy(() => import('@/pages/AnalysePage'));
+const AufgabenPage = lazy(() => import('@/pages/AufgabenPage'));
 const NotFound = lazy(() => import('@/pages/NotFound'));
 
 function AppRoutes() {
@@ -36,6 +37,7 @@ function AppRoutes() {
             <Route path="/pdf-ruecklauf" element={<PdfRuecklauf />} />
             <Route path="/mitarbeiter" element={<MitarbeiterPage />} />
             <Route path="/analyse" element={<AnalysePage />} />
+            <Route path="/aufgaben" element={<AufgabenPage />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>

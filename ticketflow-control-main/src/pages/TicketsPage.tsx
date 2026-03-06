@@ -243,7 +243,7 @@ export default function TicketsPage() {
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowEmail(false)}>Abbrechen</Button>
-              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700" onClick={() => {
+              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700" onClick={async () => {
                 setSendingEmail(true);
                 try {
                   const STATUS_LABELS: Record<string,string> = {

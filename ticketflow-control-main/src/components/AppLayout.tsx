@@ -42,6 +42,7 @@ const NAV_ITEMS = [
   { to: '/pdf-ruecklauf', icon: FileText, label: 'PDF-Rücklauf' },
   { to: '/mitarbeiter', icon: Users, label: 'Mitarbeiter' },
   { to: '/analyse', icon: TrendingUp, label: 'Analyse' },
+  { to: '/aufgaben', icon: ClipboardCheck, label: 'Begehungen' },
 ];
 
 function SidebarNavLink({ to, icon: Icon, children }: { to: string; icon: any; children: string }) {

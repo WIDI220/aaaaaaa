@@ -10,7 +10,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import { Search, ChevronLeft, ChevronRight, Trash2, Pencil, Clock, Plus, AlertTriangle } from 'lucide-react';
+import { Search, ChevronLeft, ChevronRight, Trash2, Pencil, Clock, Plus, AlertTriangle, Mail, Send } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 
 const STATUS_OPTIONS = [
   { value: 'in_bearbeitung', label: 'In Bearbeitung', bg: 'bg-blue-100', text: 'text-blue-700' },
@@ -34,6 +35,10 @@ export default function TicketsPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [monthFilter, setMonthFilter] = useState<'month'|'all'>('month');
   const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [showEmail, setShowEmail] = useState(false);
+  const [emailTo, setEmailTo] = useState('');
+  const [emailSubject, setEmailSubject] = useState('');
+  const [emailNote, setEmailNote] = useState('');
 
   const { data, isLoading } = useQuery({
     queryKey: ['tickets-list', search, statusFilter, gewerkFilter, page, activeMonth, monthFilter],
@@ -102,13 +107,17 @@ export default function TicketsPage() {
           <SelectTrigger className="w-[120px] h-9 rounded-xl border-gray-200"><SelectValue placeholder="Gewerk" /></SelectTrigger>
           <SelectContent><SelectItem value="all">Alle</SelectItem><SelectItem value="Hochbau">Hochbau</SelectItem><SelectItem value="Elektro">Elektro</SelectItem></SelectContent>
         </Select>
-        {selected.size > 0 && (
+        {selected.size > 0 && (<>
+          <Button variant="outline" size="sm" className="h-9 rounded-xl border-blue-200 text-blue-600 hover:bg-blue-50"
+            onClick={() => { setEmailSubject(`Rückmeldung zu ${selected.size} Ticket(s)`); setShowEmail(true); }}>
+            <Mail className="h-4 w-4 mr-1" />{selected.size} per E-Mail
+          </Button>
           <Button variant="destructive" size="sm" className="h-9 rounded-xl"
             onClick={() => { if (confirm(`${selected.size} löschen?`)) deleteMutation.mutate(Array.from(selected)); }}
             disabled={deleteMutation.isPending}>
             <Trash2 className="h-4 w-4 mr-1" />{selected.size} löschen
           </Button>
-        )}
+        </>)}
         <Button variant="outline" size="sm" className="h-9 rounded-xl text-red-500 border-red-200 hover:bg-red-50 ml-auto"
           onClick={() => setShowDeleteAll(true)}>
           <Trash2 className="h-4 w-4 mr-1" />Alle löschen
@@ -191,6 +200,61 @@ export default function TicketsPage() {
             <Button variant="destructive" className="flex-1" onClick={() => deleteAllMutation.mutate()} disabled={deleteAllMutation.isPending}>
               {deleteAllMutation.isPending ? 'Löscht...' : 'Ja, alle löschen'}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+
+      {/* E-Mail Rückmeldung Dialog */}
+      <Dialog open={showEmail} onOpenChange={setShowEmail}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><Mail className="h-5 w-5 text-blue-500" />Rückmeldung per E-Mail</DialogTitle></DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Empfänger E-Mail</Label>
+              <Input placeholder="empfaenger@beispiel.de" value={emailTo} onChange={e => setEmailTo(e.target.value)} className="rounded-xl" />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Betreff</Label>
+              <Input value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="rounded-xl" />
+            </div>
+            <div>
+              <Label className="text-xs text-gray-500 mb-1 block">Begründung / Anliegen</Label>
+              <Textarea placeholder="Beschreiben Sie Ihr Anliegen zu den markierten Tickets..." value={emailNote} onChange={e => setEmailNote(e.target.value)} className="rounded-xl min-h-[100px]" />
+            </div>
+            {/* Ticket Vorschau */}
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-xs font-semibold text-gray-500 mb-2">Markierte Tickets ({selected.size}):</p>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {tickets.filter((t: any) => selected.has(t.id)).map((t: any) => {
+                  const st = STATUS_OPTIONS.find(s => s.value === t.status);
+                  return (
+                    <div key={t.id} className="flex items-center gap-2 text-xs bg-white rounded-lg px-3 py-2 border border-gray-100">
+                      <span className="font-mono font-bold text-[#1e3a5f]">{t.a_nummer}</span>
+                      <span className="text-gray-400">{t.gewerk}</span>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${st?.bg} ${st?.text}`}>{st?.label}</span>
+                      {t.eingangsdatum && <span className="text-gray-400 ml-auto">{new Date(t.eingangsdatum).toLocaleDateString('de-DE')}</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowEmail(false)}>Abbrechen</Button>
+              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700" onClick={() => {
+                const ticketLines = tickets
+                  .filter((t: any) => selected.has(t.id))
+                  .map((t: any) => {
+                    const st = STATUS_OPTIONS.find(s => s.value === t.status);
+                    return `• ${t.a_nummer} | ${t.gewerk} | ${st?.label ?? t.status} | Eingang: ${t.eingangsdatum ? new Date(t.eingangsdatum).toLocaleDateString('de-DE') : '–'}`;
+                  }).join('\n');
+                const body = `${emailNote ? emailNote + '\n\n' : ''}Betroffene Tickets (${selected.size}):\n${ticketLines}\n\nMit freundlichen Grüßen\nWIDI Gebäudeservice GmbH`;
+                window.location.href = `mailto:${emailTo}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(body)}`;
+                setShowEmail(false);
+              }}>
+                <Send className="h-4 w-4 mr-1" /> E-Mail öffnen
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

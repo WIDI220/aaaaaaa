@@ -246,7 +246,7 @@ function generateHTML({ monthName, t, w, e, totalH, prevTotalH, veraenderung,
 
 <!-- EXECUTIVE SUMMARY -->
 <div class="card">
-  <p class="card-title">Executive Summary</p>
+  <p class="card-title">Zusammenfassung</p>
   <p class="card-desc">
     Im Monat <strong>${monthName}</strong> wurden insgesamt <strong>${t.length} Tickets</strong> bearbeitet, wovon <strong>${erledigtCount} (${erledigungsQuote}%) erfolgreich abgeschlossen</strong> wurden. Die Gesamtleistung des Teams beträgt <strong>${totalH.toFixed(1)} Stunden</strong>
     ${veraenderung ? `, was einem ${trendVal>=0?'Anstieg':'Rückgang'} von <strong style="color:${trendColor};">${Math.abs(trendVal)}%</strong> gegenüber dem Vormonat entspricht` : ''}.
@@ -271,7 +271,7 @@ function generateHTML({ monthName, t, w, e, totalH, prevTotalH, veraenderung,
 <div class="grid2">
   <div class="card">
     <p class="card-title">Statusverteilung</p>
-    <p class="card-desc">Aufschlüsselung aller Tickets nach aktuellem Bearbeitungsstand.</p>
+    <p class="card-desc">Aufschlüsselung aller Tickets nach ihrem aktuellen Bearbeitungsstand.</p>
     ${[
       ['In Bearbeitung', offenCount, '#dbeafe','#1d4ed8'],
       ['Erledigt', t.filter(x=>x.status==='erledigt').length, '#dcfce7','#16a34a'],
@@ -330,7 +330,7 @@ function generateHTML({ monthName, t, w, e, totalH, prevTotalH, veraenderung,
 <!-- GEWERK CHART -->
 <div class="card">
   <p class="card-title">Gewerk-Vergleich</p>
-  <p class="card-desc">Gegenüberstellung von Hochbau und Elektro nach Ticket-Anzahl und geleisteten Stunden.</p>
+  <p class="card-desc">Gegenüberstellung von Hochbau und Elektro nach Ticketanzahl und geleisteten Stunden.</p>
   ${gewerkChart}
 </div>
 
@@ -339,20 +339,20 @@ ${e.length > 0 ? `
 <div class="grid2">
   <div class="card">
     <p class="card-title">Stunden pro Mitarbeiter</p>
-    <p class="card-desc">Gesamte gebuchte Arbeitsstunden je Mitarbeiter im Monat ${monthName}.</p>
+    <p class="card-desc">Gebuchte Arbeitsstunden je Mitarbeiter im Monat ${monthName}.</p>
     ${stundenChart}
   </div>
   <div class="card">
     <p class="card-title">Tickets pro Mitarbeiter</p>
-    <p class="card-desc">Anzahl der bearbeiteten Tickets je Mitarbeiter im Monat ${monthName}.</p>
+    <p class="card-desc">Anzahl bearbeiteter Tickets je Mitarbeiter im Monat ${monthName}.</p>
     ${ticketChart}
   </div>
 </div>` : ''}
 
 <!-- MITARBEITER TABELLE -->
 <div class="card page-break">
-  <p class="card-title">Mitarbeiter Auswertung</p>
-  <p class="card-desc">Detaillierte Übersicht über die Leistung jedes Mitarbeiters: Stunden, Ticket-Anzahl, Durchschnitt pro Ticket und prozentualer Anteil am Teamvolumen.</p>
+  <p class="card-title">Mitarbeiterauswertung</p>
+  <p class="card-desc">Detaillierte Übersicht über Stunden, Ticket-Anzahl, Durchschnitt pro Ticket und prozentualer Anteil am Teamvolumen.</p>
   ${e.length===0 ? '<p style="color:#94a3b8;text-align:center;padding:30px;">Keine Buchungen in diesem Monat</p>' : `
   <table style="width:100%;border-collapse:collapse;">
     <thead><tr>
@@ -368,8 +368,8 @@ ${e.length > 0 ? `
 
 <!-- TICKET LISTE KOMPLETT -->
 <div class="card page-break">
-  <p class="card-title">Vollständige Ticket-Liste</p>
-  <p class="card-desc">Alle ${t.length} Tickets des Monats ${monthName} mit Status, Eingansdatum, zuständigen Mitarbeitern und gebuchten Stunden.</p>
+  <p class="card-title">Vollständige Ticketliste</p>
+  <p class="card-desc">Alle ${t.length} Tickets des Monats ${monthName} mit Status, Eingangsdatum, zuständigen Mitarbeitern und gebuchten Stunden.</p>
   <table style="width:100%;border-collapse:collapse;">
     <thead><tr>
       <th>A-Nummer</th><th>Gewerk</th><th>Status</th><th>Eingang</th><th style="text-align:center;">Mitarbeiter</th><th style="text-align:right;">Stunden</th>

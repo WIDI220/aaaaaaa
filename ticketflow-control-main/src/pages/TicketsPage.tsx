@@ -11,9 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
-import emailjs from '@emailjs/browser';
-import { Search, ChevronLeft, ChevronRight, Trash2, Pencil, Clock, Plus, AlertTriangle, Mail, Send } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
+import { Search, ChevronLeft, ChevronRight, Trash2, Pencil, Clock, Plus, AlertTriangle, Mail } from 'lucide-react';
 
 const STATUS_OPTIONS = [
   { value: 'in_bearbeitung', label: 'In Bearbeitung', bg: 'bg-blue-100', text: 'text-blue-700' },
@@ -43,8 +41,6 @@ export default function TicketsPage() {
   const [emailTo, setEmailTo] = useState('');
   const [emailSubject, setEmailSubject] = useState('');
   const [emailNote, setEmailNote] = useState('');
-  const [sendingEmail, setSendingEmail] = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ['tickets-list', search, statusFilter, gewerkFilter, page, activeMonth, monthFilter],
@@ -247,8 +243,7 @@ export default function TicketsPage() {
             </div>
             <div className="flex gap-3 pt-2">
               <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setShowEmail(false)}>Abbrechen</Button>
-              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700" disabled={sendingEmail || emailSent}
-              onClick={async () => {
+              <Button className="flex-1 rounded-xl bg-blue-600 hover:bg-blue-700" onClick={() => {
                 setSendingEmail(true);
                 try {
                   const STATUS_LABELS: Record<string,string> = {
@@ -261,7 +256,7 @@ export default function TicketsPage() {
                   ).join('\n');
                   const content = `${emailNote ? 'Anliegen:\n' + emailNote + '\n\n' : ''}Betroffene Tickets (${selectedTickets.length}):\n${ticketLines}\n\n---\nGesendet von WIDI Controlling System\n${new Date().toLocaleDateString('de-DE')}`;
                   emailjs.init('y7g5YcPgorv_NmH0y');
-                  await emailjs.send('service_22oktze', 'template_s043jzj', {
+                  await emailjs.send('service_bhia75n', 'template_s043jzj', {
                     to_email: emailTo,
                     to_name: emailTo,
                     subject: emailSubject,
@@ -274,7 +269,7 @@ export default function TicketsPage() {
                   toast.error('E-Mail Fehler: ' + (e?.text ?? e?.message ?? 'Unbekannt'));
                 } finally { setSendingEmail(false); }
               }}>
-                {sendingEmail ? 'Sendet...' : emailSent ? '✅ Gesendet!' : <><Send className="h-4 w-4 mr-1" />E-Mail senden</>}
+                <><Mail className="h-4 w-4 mr-1" />E-Mail öffnen</>
               </Button>
             </div>
           </div>
